@@ -86,7 +86,7 @@ namespace MySql.Data.MySqlClient.Tests
 #endif
       }
 
-#if !CF && !RT  //No Security.Principal on CF
+#if !RT  //No Security.Principal on CF
 
     [Fact]
     public void TestIntegratedSecurityNoPoolingWithoutUser()
@@ -856,7 +856,7 @@ namespace MySql.Data.MySqlClient.Tests
           }
       }
 
-#if !CF && !RT
+#if !RT
     [Fact]
     public void CanOpenConnectionInMediumTrust()
     {
@@ -915,26 +915,6 @@ namespace MySql.Data.MySqlClient.Tests
     }
 #endif
 
-#if CF
-        /// <summary>
-        /// A client running in .NET Compact Framework can't connect to MySQL server using SSL and a pfx file.
-        /// <remarks>
-        /// This test requires starting the server with SSL support. 
-        /// For instance, the following command line enables SSL in the server:
-        /// mysqld --no-defaults --standalone --console --ssl-ca='MySQLServerDir'\mysql-test\std_data\cacert.pem --ssl-cert='MySQLServerDir'\mysql-test\std_data\server-cert.pem --ssl-key='MySQLServerDir'\mysql-test\std_data\server-key.pem
-        /// </remarks>
-        /// </summary>
-        [Fact]
-        [ExpectedException(typeof(ArgumentException))]
-        public void CannotConnectUsingFileBasedCertificateInCF()
-        {
-            string connstr = GetConnectionString(true);
-            connstr += ";CertificateFile=client.pfx;CertificatePassword=pass;SSL Mode=Required;";
-
-            MySqlConnection c = new MySqlConnection(connstr);
-        }
-#endif
-
       [Fact]
       public void CanOpenConnectionAfterAborting()
       {
@@ -983,7 +963,6 @@ namespace MySql.Data.MySqlClient.Tests
       }
 
 
-#if !CF
       /// <summary>
       /// Fix for bug http://bugs.mysql.com/bug.php?id=63942 (Connections not closed properly when using pooling)
       /// </summary>
@@ -1035,8 +1014,6 @@ namespace MySql.Data.MySqlClient.Tests
           Assert.Equal(numClientsAborted, numClientsAborted2);
           con.Close();
       }
-#endif
-
 
       /// <summary>
       /// Test for Connect attributes feature used in MySql Server > 5.6.6
@@ -1095,6 +1072,7 @@ namespace MySql.Data.MySqlClient.Tests
 
                   st.suExecSQL(string.Format("CREATE USER {0} IDENTIFIED BY '{1}1'", expiredfull, expireduser));
                   st.suExecSQL(string.Format("GRANT SELECT ON `{0}`.* TO {1}", conn.Database, expiredfull));
+
                   st.suExecSQL(string.Format("ALTER USER {0} PASSWORD EXPIRE", expiredfull));
                   conn.Close();
 
@@ -1106,7 +1084,11 @@ namespace MySql.Data.MySqlClient.Tests
                   MySqlException ex = Assert.Throws<MySqlException>(() => cmd.ExecuteScalar());
                   Assert.Equal(1820, ex.Number);
 
-                  cmd.CommandText = string.Format("SET PASSWORD = PASSWORD('{0}1')", expireduser);
+                  if (st.Version >= new Version(5, 7, 6))
+                    cmd.CommandText = string.Format("SET PASSWORD = '{0}1'", expireduser);
+                  else
+                    cmd.CommandText = string.Format("SET PASSWORD = PASSWORD('{0}1')", expireduser);
+
                   cmd.ExecuteNonQuery();
                   conn.Close();
 
